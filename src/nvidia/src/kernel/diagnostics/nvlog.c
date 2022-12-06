@@ -103,7 +103,7 @@ nvlogDestroy()
     tlsShutdown();
     for (i = 0; i < NVLOG_MAX_BUFFERS; i++)
     {
-        nvlogDeallocBuffer(i);
+        nvlogDeallocBuffer(i, NV_TRUE);
     }
     if (NvLogLogger.mainLock != NULL)
     {
@@ -261,7 +261,8 @@ nvlogAllocBuffer
 void
 nvlogDeallocBuffer
 (
-    NVLOG_BUFFER_HANDLE hBuffer
+    NVLOG_BUFFER_HANDLE hBuffer,
+    NvBool bDeallocPreserved
 )
 {
     NVLOG_BUFFER *pBuffer;
@@ -270,6 +271,12 @@ nvlogDeallocBuffer
         return;
 
     pBuffer = NvLogLogger.pBuffers[hBuffer];
+
+    if (FLD_TEST_DRF(LOG_BUFFER, _FLAGS, _PRESERVE, _YES, pBuffer->flags) &&
+        !bDeallocPreserved)
+    {
+        return;
+    }
 
     pBuffer->flags = FLD_SET_DRF(LOG_BUFFER, _FLAGS, _DISABLED,
                                  _YES, pBuffer->flags);
@@ -567,6 +574,7 @@ nvlogNowrapBufferPush
                   // Another thread has already expanded the buffer, bail out.
                   // TODO: Maybe we could store the handle and then try again?
                   portSyncSpinlockRelease(NvLogLogger.mainLock);
+                  portMemFree(pNewBuffer);
                   return NV_FALSE;
               }
 
